@@ -1,0 +1,14 @@
+# ignore build artifacts
+/resources/public/js
+
+# from lein templates
+/target
+/classes
+/checkouts
+pom.xml
+pom.xml.asc
+*.jar
+*.class
+/.lein-*
+/.nrepl-port
+figwheel_server.log
