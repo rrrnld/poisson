@@ -89,10 +89,12 @@
           height (q/height)
           chosen (rand-nth (seq (:active state)))
           next (->>
-                ;; generate up to k points
-                (repeatedly k #(rand-around chosen r (* 2 r)))
-                ;; keep only the ones in our screen space
-                (filter (fn [[x y]] (and (<= 0 x (dec width)) (<= 0 y (dec height)))))
+                ;; generate k points
+                (take k (->> (repeatedly #(rand-around chosen r (* 2 r)))
+                             ;; keep only the ones in our screen space
+                             (filter (fn [[x y]]
+                                       (and (<= 0 x (dec width))
+                                            (<= 0 y (dec height)))))))
                 ;; for each point, check if it is within distance r of existing
                 ;; samples if it is far enough, emit it as a sample and add it
                 ;; to the active list
