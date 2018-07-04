@@ -2,125 +2,145 @@
   (:require [quil.core :as q :include-macros true]
             [quil.middleware :as m]))
 
-;; FIXME: Clearly something happens at the border. I will have to figure out what exactly
+;; FIXME: The problem is that len(grid) < x + (y * height), but if we initialize grid width cols + cols * rows we get weird artifacts
 
-(def r 10) ;; determines grid size
-(def k 30) ;; iteration steps until we pick a sample
-(def w (/ r (Math/sqrt 2)))
+(def r 10) ;; minimum distance between samples
+(def k 30) ;; limit of samples to choose before rejection
+(def n 2)  ;; number of dimensions
+(def w (/ r (Math/sqrt n)))
 
-(defn make-grid [width height]
-  ;; STEP 0
-  (let [cols (Math/floor (/ width w))
-        rows (Math/floor (/ height w))]
-    (vec (repeat (* cols rows) nil))))
+(defn col
+  "Returns the column for a given x-coordinate"
+  [x]
+  (Math/floor (/ x w)))
 
-(defn pos->idx
-  "Takes a vector and returns the corresponding index in our grid"
-  [[x y] width]
-  (+ (Math/floor (/ x w)) (* (Math/floor (/ y w)) (Math/floor (/ width w)))))
+(defn row
+  "Returns the row for a given y-coordinate"
+  [y]
+  (Math/floor (/ y w)))
 
-(defn pick-sample
+(defn make-grid
+  "Initialize our background grid"
   [width height]
-  (let [x (rand width)
-        y (rand height)
-        pos [x y]]
-    [x y]))
+  (let [ncols (inc (col width))
+        nrows (inc (row height))]
+    (vec (repeat (* ncols nrows) nil))))
+
+(defn into-grid
+  "Inserts a point at the correct location in the grid"
+  [grid width pos]
+  (let [[x y] pos
+        idx (+ (col x) (* (row y) (col width)))]
+    (try
+      (assoc grid idx pos)
+      (catch js/Error e
+        (println "into-grid failed:" "width" width "pos" pos "idx" idx
+                 "col" (col x) "row" (row y))
+        (throw e)))))
+
+(defn neighbors
+  "Returns non-empty cells in a 3x3 neighborhood"
+  [grid width height [x y]]
+  (let [c (col x)
+        r (row y)
+        cols (col width)
+        rows (row height)]
+    (->>
+     (for [j (range (dec r) (+ r 2))
+           i (range (dec c) (+ c 2))]
+       [i j])
+     (filter (fn [[i j]]
+               (and (< -1 i cols) (< -1 j rows))))
+     (keep (fn [[i j]]
+             (nth grid (+ i (* j cols))))))))
+
+(defn rand-around
+  "Generates in a given distance around a point"
+  [[x y] min-dist max-dist]
+  (let [dist (+ min-dist (rand (- max-dist min-dist)))
+        a (rand (* Math/PI 2))
+        off-x (* dist (Math/cos a))
+        off-y (* dist (Math/sin a))]
+    [(+ x off-x) (+ y off-y)]))
+
+(defn distance
+  "Calculates the distance between two two-dimensional vectors"
+  [[a1 a2] [b1 b2]]
+  (Math/sqrt (* (- a1 b1) (- a1 b1)) (* (- a2 b2) (- a2 b2))))
+
+(defn init-with-point
+  "Returns the initial state"
+  [pos width height]
+  {:grid (into-grid (make-grid width height) width pos)
+   :active #{pos}})
 
 (defn setup []
-  (q/frame-rate 30)
+  (q/frame-rate 60)
   (q/color-mode :hsb)
   (let [width (q/width)
         height (q/height)
-        sample (pick-sample width height)]
-    ;; initialize our grid and pick our first element randomly
-    {:grid (-> (make-grid width height)
-               (assoc (pos->idx sample width) sample))
-     :active [sample]}))
+        pos [(q/random width) (q/random height)]]
+    (init-with-point pos width height)))
 
-(defn spawn-vector
-  "Generates a random 2-dimensional vector at x, y with the specified length"
-  [[x y] length]
-  (let [[v1 v2] (q/random-2d)]
-    [(+ x (* v1 length)) (+ y (* v2 length))]))
-
-(defn neighbors
-  "Returns all non-nil neighbors for a vector in `grid`"
-  [[x y] grid width height]
-  (let [col (Math/floor (/ x w))
-        row (Math/floor (/ y w))]
-    (->> (for [j (range -1 2)
-               i (range -1 2)]
-           (let [col (+ col i)
-                 row (+ row j)]
-             (when (and (< -1 col width) (< -1 row height))
-               (+ col (* row (Math/floor (/ width w)))))))
-         (keep (partial nth grid)))))
-
-(defn dist
-  "Returns the distance between two 2-dimensional vectors"
-  [[a b] [c d]]
-  (Math/sqrt (+ (* (- c a) (- c a)) (* (- d b) (- d b)))))
-
-(defn vec-remove
-  "Remove item at idx from coll, where coll is an IPersistentVector"
-  [coll idx]
-  (vec (concat (subvec coll 0 idx) (subvec coll (inc idx)))))
-
-(defn dprint
-  "Prints and returns a value, optionally with a given `label`"
-  ([label x] (println label x) x)
-  ([x] (println x) x))
-
-(defn update-state [{:keys [grid active] :as state}]
-  (if (seq active)
-    ;; choose next sample
-    (let [idx (rand-int (count active))
-          pos (nth active idx)
-          width (q/width)
+(defn pick-samples [state]
+  ;; while the active list is not empty...
+  (if (seq (:active state))
+    (let [width (q/width)
           height (q/height)
-          sample (->>
-                  ;; generate up to k samples
-                  (for [_ (range k)]
-                    (spawn-vector pos (+ r (rand r))))
-                  ;; for every sample we generated, we check whether the
-                  ;; neighbors around it are spaced out far enough
-                  (filter
-                   (fn [s]
-                     (every? #(>= (dist % s) r) (neighbors s grid width height))))
-                  (first))]
-      {:active (if sample
-                 (conj active sample)
-                 (vec-remove (vec active) idx))
-       :grid (assoc grid (pos->idx sample width) sample)})
-    ;; leave state untouched, we're done
+          chosen (rand-nth (seq (:active state)))
+          next (->>
+                ;; generate up to k points
+                (repeatedly k #(rand-around chosen r (* 2 r)))
+                ;; keep only the ones in our screen space
+                (filter (fn [[x y]] (and (<= 0 x (dec width)) (<= 0 y (dec height)))))
+                ;; for each point, check if it is within distance r of existing
+                ;; samples if it is far enough, emit it as a sample and add it
+                ;; to the active list
+                (reduce (fn [state sample]
+                          (let [neighborhood (neighbors (:grid state) width height sample)]
+                            (if (every? #(>= (distance sample %) r) neighborhood)
+                              (-> state
+                                  (update :grid into-grid width sample)
+                                  (update :active conj sample))
+                              state)))
+                        state))]
+      ;; if after k attempts no such point is found, instead remove our random
+      ;; active point
+      (if (= state next)
+        (update state :active disj chosen)
+        next))
     state))
 
+(defn update-state [state]
+  (first (drop 24 (iterate pick-samples state))))
+
+(defn reset-state [state event]
+  (init-with-point [(:x event) (:y event)] (q/width) (q/height)))
+
 (defn draw-state [state]
-  (q/background 0)
-  (doseq [pos (:grid state)]
-    (when-let [[x y] pos]
-      (q/stroke 255)
-      (q/stroke-weight 4)
-      (q/point x y)))
+  (q/background 20)
+  (q/stroke-weight 4)
+  (q/stroke 255)
+  (doseq [[x y] (remove nil? (:grid state))]
+    (q/point x y))
+  (q/stroke 20 255 255)
   (doseq [[x y] (:active state)]
-    (q/stroke 100 255 100)
-    (q/stroke-weight 4)
     (q/point x y)))
+
+(defn fullscreen []
+  [(.. js/document -body -offsetWidth) (.. js/document -body -offsetHeight)])
 
 ; this function is called in index.html
 (defn ^:export run-sketch []
   (q/defsketch poisson
     :host "poisson"
-    :size [500 500]
-    ; setup function called only once, during sketch initialization.
+    :size (fullscreen)
     :setup setup
-    ; update-state is called on each iteration before draw-state.
     :update update-state
+    :mouse-pressed reset-state
     :draw draw-state
-    ; This sketch uses functional-mode middleware.
-    ; Check quil wiki for more info about middlewares and particularly
-    ; fun-mode.
+    :renderer :p2d
     :middleware [m/fun-mode]))
 
-; uncomment this line to reset the sketch:
+; uncomment this line to reset the sketch on save
 (run-sketch)

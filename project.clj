@@ -5,14 +5,16 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.9.0"]
                  [quil "2.7.1"]
-                 [org.clojure/clojurescript "1.10.238"]
-                 [figwheel-sidecar "0.5.16"]
-                 [cider/piggieback "0.3.6"] ]
+                 [org.clojure/clojurescript "1.10.238"]]
+
+  :profiles {:dev {:dependencies [; use here whatever the current version of figwheel is
+                                  [figwheel-sidecar "0.5.16"]]}}
 
   :plugins [[lein-cljsbuild "1.1.7"]
-            [lein-figwheel "0.5.16"]]
+            [lein-figwheel "0.5.15"]]
   :hooks [leiningen.cljsbuild]
 
+  :clean-targets ^{:protect false} ["resources/public/js"]
   :cljsbuild
   {:builds [; development build with figwheel hot swap
             {:id "development"
