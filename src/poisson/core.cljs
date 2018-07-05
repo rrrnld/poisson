@@ -86,8 +86,8 @@
                 (repeatedly #(rand-around chosen r (* 2 r)))
                 ;; keep only the ones in our screen space
                 (filter (fn [[x y]]
-                          (and (<= 0 x (dec width))
-                               (<= 0 y (dec height)))))
+                          (and (<= 0 x width)
+                               (<= 0 y height))))
                 (take k)
                 ;; for each point, check if it is within distance r of existing
                 ;; samples if it is far enough, emit it as a sample and add it
