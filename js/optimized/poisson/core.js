@@ -206,7 +206,7 @@ return (function (p__6505){
 var vec__6506 = p__6505;
 var x = cljs.core.nth.cljs$core$IFn$_invoke$arity$3(vec__6506,(0),null);
 var y = cljs.core.nth.cljs$core$IFn$_invoke$arity$3(vec__6506,(1),null);
-return ((((((0) <= x)) && ((x <= (width - (1)))))) && (((((0) <= y)) && ((y <= (height - (1)))))));
+return ((((((0) <= x)) && ((x <= width)))) && (((((0) <= y)) && ((y <= height)))));
 });})(width,height,chosen))
 ,cljs.core.repeatedly.cljs$core$IFn$_invoke$arity$1(((function (width,height,chosen){
 return (function (){
