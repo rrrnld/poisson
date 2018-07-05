@@ -11,8 +11,12 @@
                                   [figwheel-sidecar "0.5.16"]]}}
 
   :plugins [[lein-cljsbuild "1.1.7"]
-            [lein-figwheel "0.5.15"]]
+            [lein-figwheel "0.5.15"]
+            [katlex/github-cdn "0.1.4"]]
   :hooks [leiningen.cljsbuild]
+
+  :github-cdn {:dir "resources/public"
+               :repository "git@github.com:heyarne/poisson"}
 
   :clean-targets ^{:protect false} ["resources/public/js"]
   :cljsbuild
