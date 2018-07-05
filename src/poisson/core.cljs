@@ -2,9 +2,7 @@
   (:require [quil.core :as q :include-macros true]
             [quil.middleware :as m]))
 
-;; FIXME: The problem is that len(grid) < x + (y * height), but if we initialize grid width cols + cols * rows we get weird artifacts
-
-(def r 10) ;; minimum distance between samples
+(def r 13) ;; minimum distance between samples
 (def k 30) ;; limit of samples to choose before rejection
 (def n 2)  ;; number of dimensions
 (def w (/ r (Math/sqrt n)))
@@ -31,12 +29,7 @@
   [grid width pos]
   (let [[x y] pos
         idx (+ (col x) (* (row y) (col width)))]
-    (try
-      (assoc grid idx pos)
-      (catch js/Error e
-        (println "into-grid failed:" "width" width "pos" pos "idx" idx
-                 "col" (col x) "row" (row y))
-        (throw e)))))
+    (assoc grid idx pos)))
 
 (defn neighbors
   "Returns non-empty cells in a 3x3 neighborhood"
@@ -50,7 +43,7 @@
            i (range (dec c) (+ c 2))]
        [i j])
      (filter (fn [[i j]]
-               (and (< -1 i cols) (< -1 j rows))))
+               (and (<= 0 i cols) (<= 0 j rows))))
      (keep (fn [[i j]]
              (nth grid (+ i (* j cols))))))))
 
@@ -90,11 +83,12 @@
           chosen (rand-nth (seq (:active state)))
           next (->>
                 ;; generate k points
-                (take k (->> (repeatedly #(rand-around chosen r (* 2 r)))
-                             ;; keep only the ones in our screen space
-                             (filter (fn [[x y]]
-                                       (and (<= 0 x (dec width))
-                                            (<= 0 y (dec height)))))))
+                (repeatedly #(rand-around chosen r (* 2 r)))
+                ;; keep only the ones in our screen space
+                (filter (fn [[x y]]
+                          (and (<= 0 x (dec width))
+                               (<= 0 y (dec height)))))
+                (take k)
                 ;; for each point, check if it is within distance r of existing
                 ;; samples if it is far enough, emit it as a sample and add it
                 ;; to the active list
@@ -114,7 +108,7 @@
     state))
 
 (defn update-state [state]
-  (first (drop 24 (iterate pick-samples state))))
+  (nth (iterate pick-samples state) 25))
 
 (defn reset-state [state event]
   (init-with-point [(:x event) (:y event)] (q/width) (q/height)))
