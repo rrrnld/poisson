@@ -454,4 +454,3 @@ return quil.sketch.add_sketch_to_init_list(new cljs.core.PersistentArrayMap(null
 }
 });
 goog.exportSymbol('poisson.core.run_sketch', poisson.core.run_sketch);
-poisson.core.run_sketch();
