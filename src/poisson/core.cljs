@@ -7,45 +7,38 @@
 (def n 2)  ;; number of dimensions
 (def w (/ r (Math/sqrt n)))
 
-(defn col
-  "Returns the column for a given x-coordinate"
-  [x]
-  (Math/floor (/ x w)))
-
-(defn row
-  "Returns the row for a given y-coordinate"
-  [y]
-  (Math/floor (/ y w)))
+(defn grid-idx
+  "Returns the horizontal or vertical grid index for a coordinate"
+  [a]
+  (Math/floor (/ a w)))
 
 (defn make-grid
   "Initialize our background grid"
   [width height]
-  (let [ncols (inc (col width))
-        nrows (inc (row height))]
+  (let [ncols (inc (grid-idx width))
+        nrows (inc (grid-idx height))]
     (vec (repeat (* ncols nrows) nil))))
 
 (defn into-grid
   "Inserts a point at the correct location in the grid"
   [grid width pos]
   (let [[x y] pos
-        idx (+ (col x) (* (row y) (col width)))]
+        idx (+ (grid-idx x) (* (grid-idx y) (grid-idx width)))]
     (assoc grid idx pos)))
 
 (defn neighbors
   "Returns non-empty cells in a 3x3 neighborhood"
   [grid width height [x y]]
-  (let [c (col x)
-        r (row y)
-        cols (col width)
-        rows (row height)]
+  (let [c (grid-idx x)
+        r (grid-idx y)
+        cols (inc (grid-idx width))
+        rows (inc (grid-idx height))]
     (->>
-     (for [j (range (dec r) (+ r 2))
-           i (range (dec c) (+ c 2))]
+     (for [j (range (max 0 (dec r)) (min rows (+ r 2)))
+           i (range (max 0 (dec c)) (min cols (+ c 2)))]
        [i j])
-     (filter (fn [[i j]]
-               (and (<= 0 i cols) (<= 0 j rows))))
      (keep (fn [[i j]]
-             (nth grid (+ i (* j cols))))))))
+             (nth grid (+ i (* j (dec cols)))))))))
 
 (defn rand-around
   "Generates in a given distance around a point"
@@ -113,15 +106,16 @@
 (defn reset-state [state event]
   (init-with-point [(:x event) (:y event)] (q/width) (q/height)))
 
-(defn draw-state [state]
-  (q/background 20)
+(defn draw-state [{:keys [active grid]}]
+  (q/background 20 180 200)
   (q/stroke-weight 4)
+  (q/stroke 20 200 120)
+  (doseq [pt (remove nil? grid)]
+    (when-not (active pt)
+      (apply q/point pt)))
   (q/stroke 255)
-  (doseq [[x y] (remove nil? (:grid state))]
-    (q/point x y))
-  (q/stroke 20 255 255)
-  (doseq [[x y] (:active state)]
-    (q/point x y)))
+  (doseq [pt active]
+    (apply q/point pt)))
 
 (defn fullscreen []
   [(.. js/document -body -offsetWidth) (.. js/document -body -offsetHeight)])
