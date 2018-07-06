@@ -133,4 +133,4 @@
     :middleware [m/fun-mode]))
 
 ; uncomment this line to reset the sketch on save
-(run-sketch)
+; (run-sketch)
